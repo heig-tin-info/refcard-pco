@@ -8,7 +8,7 @@ Cette carte de référence est destinée à accompagner l'étudiant durant ses �
 
 La carte de référence est une feuille A4 recto-verso supposément imprimée sur du papier cartonné violet :
 
-[![Preview](https://imgur.com/OB9Vi4M.jpg)](https://github.com/heig-tin-info/refcard-pco/releases/latest/download/refcard-pco.pdf)
+[![Preview](preview.png)](https://github.com/heig-tin-info/refcard-pco/releases/latest/download/refcard-pco.pdf)
 
 ## Build
 
