@@ -19,7 +19,7 @@
 \input{revision}
 
 \ifdefined\tinted
-  \pagecolor{ProcessBlue!30}
+  \pagecolor{Orchid!30}
 \fi
 
 \setlength{\parskip}{0.2em}
@@ -27,7 +27,7 @@
 
 % Highlight configuration for C programming language
 \lstset{
-  language=c,
+  language=c++,
   breaklines=true,
   keywordstyle=\bfseries\color{black},
   basicstyle=\ttfamily\color{black},
@@ -79,15 +79,14 @@
     \begin{tabularx}{\columnwidth}{lX}
         \raisebox{-\totalheight}{\includegraphics[width=1cm]{assets/heig-vd-black.pdf}} &
         \begin{center}
-            {\Large \bf Carte de référence C++11/C++17} \\
+            {\Large \bf Carte de référence C++ (concurrence)} \\
             version \revision \ -- \revisiondate \\
         \end{center}
     \end{tabularx}
 
     Cette carte de référence peut être utilisée durant les travaux écrits et examens
     des cours \emph{progoo} et \emph{progoox} à moins que le contraire soit explicitement formulé.
-    Elle est une liste non exhaustive des possibilités du langage C++ et un complément à la carte de référence du langage C.
-    Ce travail est inspiré de \emph{Learn X in Y} et de la carte de référence de Matt Mahoney.
+    Elle est une liste non exhaustive des fonctionnalités de programmation concurrente en C++.
     Ci-dessous, la signification des termes utilisés dans cette carte de référence.
 
     \begin{tabularx}{\linewidth}{
@@ -106,438 +105,445 @@
     \end{tabularx}
     \hrule
 
-    \section*{Différences C/C++}
+    \section*{Threads}
     \begin{lstlisting}
-sizeof('c') == sizeof(char) == 1 // Différence par rapport au C
-void func();                     // func n'accepte aucun arguments
-int *ip = nullptr;               // Utiliser à la place de NULL
-#include <cstdio>                // Au lieu de <stdio.h> (pas de .h)
-\end{lstlisting}
+#include <thread>
+void func(int a, int b);         // Fonction à exécuter
+std::thread t(func, 1, 2);       // Créer un thread
+t.joinable();                    // Vérifier si le thread est actif
+t.get_id();                      // Obtenir l'identifiant du thread
+t.join();                        // Attendre la fin du thread
+t.detach();                      // Détacher le thread de l'objet
 
-    \section*{Généralités et spécificités}
+std::this_thread::sleep_for(1s); // Attendre 1 seconde
+std::this_thread::yield();       // Relâcher le CPU
+std::thread::hardware_concurrency(); // Nombre de threads supportés par le CPU
 
-    \begin{lstlisting}
-// Surcharge de fonctions
-void say(char const* s) { printf("%s\n", s); }
-void say(int u) { printf("%d\n", u); }
-void main() { say("Hello"); say(15); }
+auto std::thread t([]() {             // Lambda function
+    std::cout << "Hello" << std::endl;
+});
 
-// Arguments par défaut
-void foo(int a = 1; int b = 4) { ... }
-void main() {
-   foo();      // a = 1, b = 4
-   foo(20);    // a = 20, b = 4
-   foo(20, 5); // a = 20, b = 5
-}
-
-for(auto x; iterable)   // Boucle itérative sur itérable
-int& r = x;             // Référence r sur x
-\end{lstlisting}
-
-    \section*{Entrées sorties (streams)}
-
-    \begin{lstlisting}
-#include <iostream>
-using namespace std; // Les streams dans l'espace de nom std
-int main() {
-   int i;
-   cout << "Enter your favorite number:\n");
-   cin >> i;
-   cout << "Your favorite number is " << i << "\n";
-   cerr << "An error message" << endl;
-}
-\end{lstlisting}
-
-    \section*{Chaînes de caractère}
-
-    \begin{lstlisting}
-#include <string>
-
-string a = "Hello", b = "World";
-cout << a + b; // "Hello World"
-cout << a + " You"; // "Hello You"
-a.append(" Dog"); // En C++ les chaînes sont modifiables
-cout << a; // "Hello Dog"
-\end{lstlisting}
-
-    \section*{Références}
-
-    \begin{lstlisting}
-string foo = "I am foo";
-string& fooRef = foo; // Référence sur foo
-fooRef += ". Hi!"; // Modifie foo via la référence
-cout << fooRef; // Affiche "I am foo. Hi!"
-
-cout << &fooRef << endl; // Affiche l'adresse de foo
-string bar = "I am bar";
-fooRef = bar;
-cout << &fooRef << endl; // Affiche toujours l'adresse de foo
-cout << fooRef; // Affiche "I am bar"
-
-const string& barRef = bar;
-barRef += ". Hi!"; // Erreur !
-
-// Objets temporaires
-string foo() { ... }
-string retVal = foo(); // Valeur de retour est temporaire
-
-void bar() {
-  const string& constRef = foo();
-  // Référence valide jusqu'à la fin de la fonction
-}
-
-string str;
-void func(string& s) { ... } // Référence standard
-void func(string&& s) { ... } // Référence temporaire
-func(str); // Référence standard
-func(foo()); // Référence temporaire
-
-\end{lstlisting}
-
-    \section*{Enumérations}
-
-    \begin{lstlisting}
-enum AnimalTypes {
-    Mammals, Birds, Reptiles, Amphibians, Fish
-};
-
-AnimalTypes GetAnimalType() {
-    return AnimalTypes::REPTILES;
-}
-
-enum Amphibians : uint8_t {
-    Frogs, // 0
-    Newts, // 1
-    Salamanders = 42, // 42
-    Toads // 43
-}; // Peut être implicitement casté en uint8_t
-
-enum class Birds : uint8_t {
-    Chickens, Hummingbirds
-}; // Ne sera pas implicitement casté
-\end{lstlisting}
-
-    \section*{Templates}
-
-    \begin{lstlisting}
-template<class T>
-class Box {
-public:
-    void insert(const T&) { ... }
-};
-
-Box<int> intBox;
-intBox.insert(42);
-
-Box<Box<int> > boxOfBox;                // Template imbriquées
-boxOfBox.insert(intBox);
-
-template <class T> T f(T t);            // Surcharge f pour tous les types
-template <class T> class X {            // Classe avec paramètre T
-   X(T t); };                           // Constructeur
-template <class T> X<T>::X(T t) {}      // Définition du constructeur
-X<int> x(3);                            // Un objet de type X de int
-template <class T, class U=T, int n=0>  // Template avec paramètres par défaults
-
-// Paramètres
-template<int Y>
-void printMessage() {
-   cout << "Your number is " << Y << endl;
-}
-
-// Spécialisation
-template<>
-void printMessage<42>() {
-   cout << "You said 42!" << endl;
-}
-printMessage<23>(); // Your number is 23
-printMessage<42>(); // You said 42!
-
-\end{lstlisting}
-
-    \section*{Namespaces}
-
-    \begin{lstlisting}
-extern "C" { void f(); }    // Si f() a été compilé dans un objet C
-namespace N { class T {}; } // Cache la classe T dans le namespace N
-N::T t;                     // Utilise le nom T du namespace N
-using namespace N;          // Rends T visible sans préfix N::
-
-using namespace std;        // Permet les appels standards sans std::
-
-namespace First {
-    namespace Nested {
-        void foo() {
-            printf("This is First::Nested::foo\n");
-        }
+std::jthread jt([](std::stop_token st) { // Thread avec stop token
+    while (!st.stop_requested()) {
+        std::cout << "Hello" << std::endl;
     }
+});
+\end{lstlisting}
+
+\section*{Verrous}
+\begin{lstlisting}
+#include <mutex>
+
+std::mutex m;                     // Créer un mutex
+m.lock();                         // Verrouiller le mutex
+m.try_lock();                     // Essayer de verrouiller le mutex
+m.unlock();                       // Déverrouiller le mutex
+
+{
+   std::lock_guard<std::mutex> lg(m); // Verrouillage automatique
+   // Code critique
+} // Déverrouillage automatique
+
+{
+    std::unique_lock<std::mutex> ul(m); // Verrouillage unique
+    // Code critique
+    ul.unlock();
+    // Code non critique
+    ul.lock();
+} // Déverrouillage automatique
+
+
+std::recursive_mutex rm;          // Mutex récursif
+std::timed_mutex tm;              // Mutex avec temporisation
+tm.try_lock_for(1s);              // Essayer de verrouiller pendant 1 seconde
+
+std::recursive_timed_mutex rtm;   // Mutex récursif avec temporisation
+\end{lstlisting}
+
+\subsection*{Mutex récursif}
+Un mutex récursif peut être verrouillé plusieurs fois par le même thread, mais doit être déverrouillé le même nombre de fois. Permet à un thread de verrouiller un mutex plusieurs fois sans se bloquer.
+
+\begin{lstlisting}
+static std::recursive_mutex rm;
+void fibonacci(int n) {
+    std::lock_guard<std::recursive_mutex> lg(rm);
+    if (n <= 2) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
 }
-namespace Second {
-    void foo() {
-        printf("This is Second::foo\n");
+\end{lstlisting}
+
+\section*{Variables conditionnelles}
+
+\begin{lstlisting}
+
+#include <condition_variable>
+
+std::condition_variable cv;       // Créer une variable conditionnelle
+
+std::unique_lock<std::mutex> ul(m); // Vérrouillage
+cv.wait(ul, []() { return condition; }); // Attendre une condition
+// Mutex déverrouillé pendant l'attente, révérouillé après
+
+cv.notify_one();                  // Réveiller un thread en attente
+cv.notify_all();                  // Réveiller tous les threads en attente
+
+\end{lstlisting}
+
+\section*{Atomics}
+
+\begin{lstlisting}
+#include <atomic>
+
+std::atomic<int> a;               // Créer une variable atomique
+a.store(42);                      // Écrire une valeur
+a.load();                         // Lire une valeur
+\end{lstlisting}
+\section*{Sémaphores}
+
+\begin{lstlisting}
+#include <semaphore> // C++20
+
+std::counting_semaphore sem(2);   // Créer un sémaphore avec 2 jetons
+sem.acquire();                    // Acquérir un jeton (décrémenter, bloquant)
+sem.release();                    // Libérer un jeton (incrémenter)
+
+std::binary_semaphore bsem;       // Créer un sémaphore binaire
+bsem.acquire();                   // Acquérir le jeton (bloquant)
+bsem.release();                   // Libérer le jeton
+
+\end{lstlisting}
+
+\section*{Barrières et latches}
+\begin{lstlisting}
+#include <barrier> // C++20
+
+std::barrier b(2);                // Créer une barrière avec 2 threads
+b.arrive_and_wait();              // Attendre que les 2 threads arrivent à la barrière
+
+b.arrive_and_drop();              // Attendre que tous les threads arrivent et libérer la barrière
+
+#include <latch> // C++20
+
+std::latch l(2);                   // Créer une latch pour deux threads
+
+l.count_down();                   // Décrémenter la latch
+l.wait();                         // Attendre que la latch atteigne zéro
+\end{lstlisting}
+
+\section*{Futures et Promesses}
+
+\begin{lstlisting}
+#include <future>
+
+std::promise<int> p;              // Créer une promesse
+std::future<int> f = p.get_future(); // Obtenir le futur associé à la promesse
+p.set_value(42);                  // Mettre une valeur dans la promesse, débloquer le futur
+f.get();                          // Attendre la valeur de la promesse
+\end{lstlisting}
+
+\section*{Ordre de mémoire}
+
+\begin{lstlisting}
+#include <atomic>
+
+std::atomic_thread_fence(std::memory_order_acquire); // Barrière d'acquisition
+
+std::atomic_thread_fence(std::memory_order_release); // Barrière de libération
+
+std::memory_order_relaxed;       // Aucun ordre n'est garanti
+std::memory_order_consume;       // Garantit la lecture des dépendances
+std::memory_order_acquire;       // Garantit la lecture des données
+std::memory_order_release;       // Garantit l'écriture des données
+std::memory_order_acq_rel;       // Garantit la lecture et l'écriture des données
+std::memory_order_seq_cst;       // Garantit l'ordre séquentiel
+\end{lstlisting}
+
+Dans cet exemple, le compilateur peut décider de réordonner les instructions de manière à ce que \cd{y} soit affecté avant \cd{b}, car il n'y a pas de dépendance entre les deux instructions, et le compilateur ne sait pas que \cd{t1} et \cd{t2} sont exécutés en parallèle.
+
+\begin{lstlisting}
+int a = 0, b = 0;
+int x = 0, y = 0;
+void t1() { a = 1; x = b; }
+void t2() { b = 1; y = a; }
+\end{lstlisting}
+
+En utilisant des ordres de mémoire, on peut garantir que les instructions sont exécutées dans l'ordre spécifié.
+
+\begin{lstlisting}
+std::atomic<int> a = 0, b = 0;
+std::atomic<int> x = 0, y = 0;
+
+void thread1() {
+    // Libération : toutes les écritures avant cette ligne sont visibles
+    a.store(1, std::memory_order_release);
+    // Acquisition : toutes les lectures après cette ligne voient les écritures précédentes
+    x = b.load(std::memory_order_acquire);
+}
+
+void thread2() {
+    // Libération : toutes les écritures avant cette ligne sont visibles
+    b.store(1, std::memory_order_release);
+    // Acquisition : toutes les lectures après cette ligne voient les écritures précédentes
+    y = a.load(std::memory_order_acquire);
+}
+\end{lstlisting}
+
+\section*{Gestion d'arrêt}
+\begin{lstlisting}
+#include <stop_token> // C++20
+
+std::stop_source ss;
+std::stop_token st = ss.get_token();
+
+while (!st.stop_requested()) {
+    // Code
+}
+
+ss.request_stop(); // Demander l'arrêt
+
+// Utile avec std::jthread
+std::jthread jt([](std::stop_token st) {
+    while (!st.stop_requested()) {
+        // Code
     }
-}
-void foo() {
-    printf("This is global foo\n");
-}
+});
 
-int main() {
-    using namespace Second;
-    Second::foo();
-    First::Nested::foo();
-    ::foo(); // Global foo
-    foo(); // Erreur car ambïgu
-}
+jt.request_stop(); // Demander l'arrêt
 \end{lstlisting}
 
-    \section*{Classes}
+\section*{Asynchronisme}
 
-    \begin{lstlisting}
-// Généralement déclaré dans un .h (ou .hpp)
-class Dog {
-    std::string name; // Privé par défaut (private:)
-    int weight;
-public:
-    Dog(); // Constructeur par défaut
+\begin{lstlisting}
+#include <future>
 
-    // Constructeur avec liste d'initialisation
-    Dog(std::string name, int weight=0) : name{name}, weight(weight)
-    { ... }
-    void setName(const std::string& dogsName);
-    void setWeight(int dogsWeight);
+// Exécuter de manière asynchrone
+std::future<int> f = std::async(std::launch::async, []() {
+    return 42;
+});
+f.get(); // Attendre le résultat
 
-    // Si marqué const, la méthode ne modifie pas l'état
-    // de l'objet.
-    virtual void print() const;
-
-    // Méthode définie dans le body d'une classe
-    void bark() const { std::cout << name << " barks!" << endl; }
-
-    // Déstructeur doit être virtuel si peut être dérivé
-    virtual ~Dog();
-
-protected:
-    // Accès possible aux classes dérivées
-
-}
-
-// Déclaration implémentée dans un .cpp
-Dog::Dog() {
-    std::cout << "A dog has been constructed\n";
-}
-
-Dog::~Dog() {
-    std::cout << "Goodbye " << name << "\n";
-}
-
-int main() {
-    Dog myDog; // Affiche "A dog has been constructed"
-    myDog.setName("Barkley");
-    myDog.setWeight(10);
-} // Print "Goodbye Barkley"
+// Exécuter de manière différée
+std::future<int> f = std::async(std::launch::deferred, []() {
+    return 42;
+});
+f.get(); // Déclencher l'exécution et attendre le résultat
 \end{lstlisting}
 
-    \section*{Héritage et polymorphisme}
+\section*{OpenMP}
 
-    \begin{lstlisting}
-class OwnedDog : public Dog {
+\begin{lstlisting}
+#include <omp.h>
+
+#pragma omp parallel
+{
+    // Code exécuté par chaque thread
+}
+
+#pragma omp parallel for
+for (int i = 0; i < 10; ++i) {
+    // Code exécuté par chaque thread
+}
+
+int sum = 0;
+#pragma omp parallel for reduction(+:sum)
+for (int i = 0; i < 10; ++i) {
+    sum += i;
+}
+
+\end{lstlisting}
+
+\section*{Moniteur}
+
+\begin{lstlisting}
+#include <condition_variable>
+
+class Monitor {
 public:
-    void setOwner(const std::string& dogsOwner);
-    void print() const override; // Surcharge
+    void enter() {
+        std::unique_lock<std::mutex> lock(m);
+        cv.wait(lock, [this] { return !locked; });
+        locked = true;
+    }
+
+    void leave() {
+        std::lock_guard<std::mutex> lock(m);
+        locked = false;
+        cv.notify_one();
+    }
+
 private:
-    std::string owner;
+    std::mutex m;
+    std::condition_variable cv;
+    bool locked = false;
 };
+\end{lstlisting}
 
-void OwnedDog::print() const {
-    Dog::print(); // Appel de la méthode du parent
-    std::cout << "Dog is owned by " << owner << endl;
+\section*{Gestion du temps}
+
+\begin{lstlisting}
+#include <chrono>
+
+std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+std::chrono::system_clock::time_point epoch; // Temps UNIX
+std::this_thread::sleep_for(123ms);
+
+// Constantes littérales temporelles C++14
+auto u = 42us; // Microsecondes
+\end{lstlisting}
+
+Exemple de mesure du temps d'exécution d'une fonction.
+
+\begin{lstlisting}
+auto start = std::chrono::high_resolution_clock::now();
+function();
+auto end = std::chrono::high_resolution_clock::now();
+auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+std::cout << duration.count() << "ms" << std::endl;
+\end{lstlisting}
+
+\section*{Alignement de la mémoire}
+
+\begin{lstlisting}
+#include <new>
+
+void* p = operator new(42);       // Allouer de la mémoire alignée
+operator delete(p);               // Libérer la mémoire
+
+void* p = operator new(42, std::align_val_t(64)); // Allouer de la mémoire alignée sur 64 octets
+
+struct alignas(64) S { int x; };  // Alignement de la structure
+
+// Cette constante représente la taille en octets de la plus petite unité de mémoire qui peut être affectée par le false sharing.
+std::hardware_destructive_interference_size;
+
+// Cette constante représente la taille en octets de la plus grande unité de mémoire qui est avantageuse à partager entre les threads.
+std::hardware_constructive_interference_size;
+\end{lstlisting}
+
+\section*{Tâche asynchrone générique}
+Utilisation de \cd{std::packaged\_task} pour encapsuler une fonction et obtenir un futur associé.
+
+\begin{lstlisting}
+#include <future>
+
+int add(int a, int b) { return a + b; }
+
+std::packaged_task<int(int, int)> task(add);
+std::future<int> f = task.get_future();
+task(1, 2);
+
+f.get(); // Attendre le résultat
+
+// Avec bind et lambda
+std::packaged_task<int()> task(std::bind(add, 1, 2));
+std::future<int> f = task.get_future();
+task();
+f.get(); // Attendre le résultat
+
+// Avec arguments génériques (templates)
+template <typename F, typename... Args>
+auto async(F&& f, Args&&... args) {
+    std::packaged_task<std::invoke_result_t<F, Args...>()> task(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+    std::future<std::invoke_result_t<F, Args...>()> f = task.get_future();
+    task();
+    return f;
 }
+
+auto f = async(add, 1, 2);
+
+f.get(); // Attendre le résultat
 \end{lstlisting}
 
-    \section*{Polymorphisme}
+\section*{Algorithmes parallèles (C++17)}
 
-    \begin{lstlisting}
-T operator+(T x, T y);  // Surcharge opérateur addition de type T
-T operator-(T x);       // Surcharge opérateur unaire de negation -x
-T operator++(int);      // Surcharge opérateur postfix
+\begin{lstlisting}
+#include <execution>
 
+std::vector<int> vec(1000, 1);
+std::for_each(std::execution::par, vec.begin(), vec.end(), [](int& n) {
+    n *= 2; });
 \end{lstlisting}
 
-    \section*{Exceptions}
+\section*{Coroutines (C++20)}
 
-    \begin{lstlisting}
-#include <exception>
-#include <stdexcept>
+\begin{lstlisting}
+    #include <coroutine>
+    #include <iostream>
 
-try {
-   throw std::runtime_error("A problem occured");
-}
-catch (const std::exception& ex) {
-   std::count << ex.what();
-}
-catch (...) {
-   std::cout << "Unknown exception caught";
-   throw; // Relève l'exception
-}
-\end{lstlisting}
+    struct ReturnObject {
+        struct promise_type {
+            ReturnObject get_return_object() { return {}; }
+            std::suspend_never initial_suspend() { return {}; }
+            std::suspend_never final_suspend() noexcept { return {}; }
+            void return_void() {}
+            void unhandled_exception() { std::terminate(); }
+        };
+    };
 
-    \section*{Conteneurs de données}
-
-    \subsection*{Vector}
-
-    \begin{lstlisting}
-#include <vector>
-
-string val;
-vector<string> vect;
-cin >> val;
-vect.push_back(val); // Ajoute à la fin
-vect.pop_back(val);  // Enlève à la fin
-vect.insert(iterator position, const value_type &val);
-vect.erase(iterator position); // Efface une position
-vect.erase(iterator first, iterator last); // Efface un intervalle
-
-\end{lstlisting}
-
-    \subsection*{Tuples (Liste non-modifiable)}
-
-    \begin{lstlisting}
-#include <tuple>
-
-auto x = make_tuple(10, 'A');
-const int maxN = 1e9;
-const int maxL = 15;
-auto y = make_tuple(maxN, maxL);
-
-// Affichage
-cout << get<0>(x) << " " << get<1>(x) << "\n"; // Affiche "10 A"
-cout << get<0>(y) << " " << get<1>(y) << "\n"; // Affiche "1000000000 15"
-
-// Unpacking
-int i;
-int c;
-tie(i, c) = x;
-
-tuple<int, char, double> z(11, 'A', 3.1415);
-
-cout << tuple_size<decltype(z)>::value << "\n"; // Affiche 3
-
-auto concatenated = tuple_cat(x, y, z); // (10, 'A', 1e9, 15, 11, 'A', 3.1415)
-
-\end{lstlisting}
-
-    \subsection*{Map (Association clé-valeur)}
-
-    \begin{lstlisting}
-#include <map>
-
-map<char, int> mymap;
-mymap.insert(pair<char,int>('A', 1));
-mymap.insert(pair<char,int>('Z', 26));
-map<char,int>::iterator it;
-
-// Affiche A->1, Z->26
-for (it=mymap.begin(); it!=mymap.end(); ++it)
-    std::cout << it->first << "->" << it->second << ', ';
-
-it = mymap.find('Z');
-count << it->second; // Affiche 26
-
-#include <unordered_map> // Plus performant mais ordre non préservé
-
-\end{lstlisting}
-
-    \subsection*{Set (Ensemble de valeurs uniques)}
-
-    \begin{lstlisting}
-#include <set>
-set<int> ST;
-ST.insert(4);
-ST.insert(8);
-ST.insert(15);
-ST.erase(8);
-
-set<int>::iterator it;
-for(it=ST.begin();it<ST.end();it++) {
-    cout << *it << endl;
-}
-ST.clear();
-cout << ST.size(); // Affiche zéro
-
-\end{lstlisting}
-
-    \section*{Fonctions anonymes (lambda)}
-
-    \begin{lstlisting}
-vector<pair<int, int> > tester;
-tester.push_back(make_pair(3,6));
-tester.push_back(make_pair(1,9));
-tester.push_back(make_pair(5,0));
-sort(
-    tester.begin(),
-    tester.end(),
-    [](const pair<int, int>& lhs, const pair<int, int>& rhs) {
-        return lhs.second < rhs.second;
+    ReturnObject foo() {
+        std::cout << "Hello" << std::endl;
+        co_await std::suspend_always{};
+        std::cout << "World" << std::endl;
     }
-);
 
-struct S { void f(int i); };
-void S::f(int i) {
-    [&, i]{};      // Ok
-    [&, &i]{};     // Erreur : i précédé par & quand & est le défaut
-    [=, this]{};   // Erreur : this quand = est défaut
-    [=, *this]{ }; // OK
-    [i, i]{};      // Erreur : i répété
+    int main() {
+        auto ret = foo();
+        // Coroutine starts, prints "Hello", suspends, then resumes and prints "World"
+    }
+\end{lstlisting}
+
+\section*{Processus}
+
+\begin{lstlisting}
+#include <unistd.h>
+
+pid_t pid = fork();               // Créer un processus enfant
+if (pid == 0) {
+    // Code du processus enfant
+    auto parent_pid = getppid();
+} else if (pid == -1) {
+    // Erreur
+} else {
+    // Code du processus parent
+    auto child_pid = pid;
 }
 \end{lstlisting}
 
-    \section*{Tokens alternatifs}
+\section*{IPC}
 
-    \begin{lstlisting}
-true and false          // Conjonction logique
-true or false           // Disjonction logique
-not true                // Négation logique
+\begin{lstlisting}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
-compl 4
-4 bitor 3               // Disjonction bit à bit
-4 bitand 3              // Conjonction bit à bit
-4 xor 3                 // Disjonction exclusive bit à bit
+// Mémoire partagée
+key_t key = ftok("file", 42);     // Générer une clé unique
+int shmid = shmget(key, 1024, 0666 | IPC_CREAT); // Créer un segment de mémoire partagée
+void* addr = shmat(shmid, NULL, 0); // Attacher le segment de mémoire partagée
+shmctl(shmid, IPC_RMID, NULL);     // Supprimer le segment de mémoire partagée
+
+// Sémaphores
+int semid = semget(key, 1, 0666 | IPC_CREAT); // Créer un ensemble de sémaphores
+semctl(semid, 0, SETVAL, 1);      // Initialiser le sémaphore à 1
+semop(semid, &op, 1);              // Opération sur le sémaphore
+
+// Files de messages
+int msqid = msgget(key, 0666 | IPC_CREAT); // Créer une file de messages
+msgsnd(msqid, &msg, sizeof(msg), 0); // Envoyer un message
+msgrcv(msqid, &msg, sizeof(msg), 0, 0); // Recevoir un message
+msgctl(msqid, IPC_RMID, NULL);    // Supprimer la file de messages
+
+// Signaux
+kill(pid, SIGKILL);               // Envoyer un signal
+signal(SIGINT, handler);          // Gérer un signal
+
+// Pipes
+int fd[2];
+pipe(fd);                         // Créer un tube
+write(fd[1], "Hello", 5);         // Écrire dans le tube
+read(fd[0], buf, 5);              // Lire depuis le tube
+close(fd[0]);                     // Fermer le tube
 \end{lstlisting}
-
-    \section*{Smart Pointer}
-
-    \begin{lstlisting}
-void foo() {
-   std::shared_ptr<Dog> doggo(new Dog());
-   doggo->bark();
-   // Pas besoin de supprimer le Dog.
-}
-
-\end{lstlisting}
-
-    \section*{Étrangetés}
-
-    \begin{lstlisting}
-// Surcharge de méthode privées
-class Foo {
-private:
-   virtual void bar();
-};
-class FooSub : public Foo {
-   virtual void bar();      // Surcharge Foo::bar!
-};
-
-assert(0 == false and false == null); // La plupart du temps
-\end{lstlisting}
-
-    \section*{S.O.L.I.D.}
-    \begin{description}
-        \item[S] Single responsibility principle
-        \item[O] Open for extension, closed for modification
-        \item[L] Liskov substition principle
-        \item[I] Interface segregation principle
-        \item[D] Dependency inversion principle
-    \end{description}
 
 \end{multicols*}
 \end{document}
