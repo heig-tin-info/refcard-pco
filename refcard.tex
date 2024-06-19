@@ -105,29 +105,31 @@
     \end{tabularx}
     \hrule
 
-    \section*{Threads}
-    \begin{lstlisting}
+\section*{Threads}
+\begin{lstlisting}
 #include <thread>
-void func(int a, int b);         // Fonction à exécuter
-std::thread t(func, 1, 2);       // Créer un thread
+void func(int a, int b);
+std::thread t(func, 1, 2);       // Créer un thread t
 t.joinable();                    // Vérifier si le thread est actif
 t.get_id();                      // Obtenir l'identifiant du thread
 t.join();                        // Attendre la fin du thread
-t.detach();                      // Détacher le thread de l'objet
 
-std::this_thread::sleep_for(1s); // Attendre 1 seconde
-std::this_thread::yield();       // Relâcher le CPU
-std::thread::hardware_concurrency(); // Nombre de threads supportés par le CPU
+// Détacher : s'exécuter en arrière-plan,
+// il n'est plus possible de joindre le thread.
+t.detach();
 
-auto std::thread t([]() {             // Lambda function
-    std::cout << "Hello" << std::endl;
-});
+std::this_thread::sleep_for(1s);     // Attendre 1 seconde
+std::this_thread::yield();           // Relâcher le CPU
+std::thread::hardware_concurrency(); // Threads supportés par le CPU
 
-std::jthread jt([](std::stop_token st) { // Thread avec stop token
-    while (!st.stop_requested()) {
-        std::cout << "Hello" << std::endl;
-    }
-});
+auto std::thread t([]() {            // Lambda function
+    std::cout << "Hello" << std::endl; });
+
+// Conteneur RAII, destructeur attend la fin du thread.
+std::jthread jt([](std::stop_token st) {
+    while (!st.stop_requested())
+        std::cout << "Hello" << std::endl; });
+jt.request_stop();                   // Demander l'arrêt
 \end{lstlisting}
 
 \section*{Verrous}
@@ -139,24 +141,17 @@ m.lock();                         // Verrouiller le mutex
 m.try_lock();                     // Essayer de verrouiller le mutex
 m.unlock();                       // Déverrouiller le mutex
 
-{
-   std::lock_guard<std::mutex> lg(m); // Verrouillage automatique
+{  std::lock_guard<std::mutex> lg(m);   // Verrouillage automatique
    // Code critique
+}  // Déverrouillage automatique
+
+{  std::unique_lock<std::mutex> ul(m);  // Verrouillage unique
+   // Code critique
+   ul.unlock(); ul.lock();              // Déverrouillage manuel
 } // Déverrouillage automatique
 
-{
-    std::unique_lock<std::mutex> ul(m); // Verrouillage unique
-    // Code critique
-    ul.unlock();
-    // Code non critique
-    ul.lock();
-} // Déverrouillage automatique
-
-
-std::recursive_mutex rm;          // Mutex récursif
 std::timed_mutex tm;              // Mutex avec temporisation
 tm.try_lock_for(1s);              // Essayer de verrouiller pendant 1 seconde
-
 std::recursive_timed_mutex rtm;   // Mutex récursif avec temporisation
 \end{lstlisting}
 
@@ -165,28 +160,32 @@ Un mutex récursif peut être verrouillé plusieurs fois par le même thread, ma
 
 \begin{lstlisting}
 static std::recursive_mutex rm;
+std::vector<int> sharedData;
 void fibonacci(int n) {
-    std::lock_guard<std::recursive_mutex> lg(rm);
+    std::lock_guard<std::recursive_mutex> lg(rm);  // Verrouillage récursif
+    sharedData.push_back(n);
     if (n <= 2) return n;
-    return fibonacci(n - 1) + fibonacci(n - 2);
+    return fibonacci(n - 1) + fibonacci(n - 2);    // Appel récursif
 }
 \end{lstlisting}
 
 \section*{Variables conditionnelles}
 
 \begin{lstlisting}
-
 #include <condition_variable>
 
-std::condition_variable cv;       // Créer une variable conditionnelle
-
-std::unique_lock<std::mutex> ul(m); // Vérrouillage
-cv.wait(ul, []() { return condition; }); // Attendre une condition
-// Mutex déverrouillé pendant l'attente, révérouillé après
+std::condition_variable cv;           // Créer une variable conditionnelle
+std::unique_lock<std::mutex> ul(m);   // Entrée en section critique
+cv.wait(ul, [u]{ return u; });        // Attendre une condition
+// Mutex: déverrouillé pendant l'attente, vérouillé durant le test de condition
+// Revérouillé après l'attente.
 
 cv.notify_one();                  // Réveiller un thread en attente
 cv.notify_all();                  // Réveiller tous les threads en attente
 
+cv.wait(ul);                      // Attendre sans condition (spurious wake)
+cv.wait_for(ul, 1s);              // Attendre pendant 1 seconde
+cv.wait_until(ul, std::chrono::system_clock::now() + 1s); // Jusqu'à
 \end{lstlisting}
 
 \section*{Atomics}
@@ -194,9 +193,26 @@ cv.notify_all();                  // Réveiller tous les threads en attente
 \begin{lstlisting}
 #include <atomic>
 
-std::atomic<int> a;               // Créer une variable atomique
-a.store(42);                      // Écrire une valeur
-a.load();                         // Lire une valeur
+std::atomic<int> a;                 // Créer une variable atomique
+a.store(42);                        // Écrire une valeur
+a.load();                           // Lire une valeur
+auto old = a.exchange(23);          // Échanger la valeur avec une nouvelle
+a.compare_exchange_strong(old, 42); // Échanger si = à old
+a.fetch_add(1);                     // Ajouter 1 à la valeur
+a.fetch_sub(1);                     // Soustraire 1 à la valeur
+a.fetch_and(0x0F);                  // ET logique
+
+// Permet de savoir si l'atomic n'utilise pas de mutex mais des
+// instructions atomiques du processeur.
+a.is_lock_free();
+
+// Alias disponibles
+std::atomic_bool, std::atomic_char, std::atomic_int, ...
+
+// Généralement plus performant car souvent lock-free
+std::atomic_flag f = ATOMIC_FLAG_INIT; // Créer un drapeau atomique
+f.test_and_set();                      // Tester et mettre à 1
+f.clear();                             // Mettre à 0
 \end{lstlisting}
 \section*{Sémaphores}
 
@@ -204,30 +220,27 @@ a.load();                         // Lire une valeur
 #include <semaphore> // C++20
 
 std::counting_semaphore sem(2);   // Créer un sémaphore avec 2 jetons
-sem.acquire();                    // Acquérir un jeton (décrémenter, bloquant)
-sem.release();                    // Libérer un jeton (incrémenter)
-
+sem.acquire();       // Acquérir un jeton (décrémenter, bloquant)
+sem.release();       // Libérer un jeton (incrémenter)
 std::binary_semaphore bsem;       // Créer un sémaphore binaire
-bsem.acquire();                   // Acquérir le jeton (bloquant)
-bsem.release();                   // Libérer le jeton
+bsem.acquire();      // Acquérir le jeton (bloquant)
+bsem.release();      // Libérer le jeton
 
+// Limitations : Pas possible de lire le nombre de jetons
+// Pas possible de contraindre le nombre de jetons maximum
 \end{lstlisting}
 
 \section*{Barrières et latches}
 \begin{lstlisting}
 #include <barrier> // C++20
-
-std::barrier b(2);                // Créer une barrière avec 2 threads
-b.arrive_and_wait();              // Attendre que les 2 threads arrivent à la barrière
-
-b.arrive_and_drop();              // Attendre que tous les threads arrivent et libérer la barrière
+std::barrier b(2);       // Créer une barrière avec 2 threads
+b.arrive_and_wait();     // Attendre les 2 threads à la barrière
+b.arrive_and_drop();     // Attendre tous les threads
 
 #include <latch> // C++20
-
-std::latch l(2);                   // Créer une latch pour deux threads
-
-l.count_down();                   // Décrémenter la latch
-l.wait();                         // Attendre que la latch atteigne zéro
+std::latch l(2);         // Créer un latch initialisé à 2
+l.count_down();          // Décrémenter la latch
+l.wait();                // Attendre que la latch atteigne zéro
 \end{lstlisting}
 
 \section*{Futures et Promesses}
@@ -235,10 +248,10 @@ l.wait();                         // Attendre que la latch atteigne zéro
 \begin{lstlisting}
 #include <future>
 
-std::promise<int> p;              // Créer une promesse
-std::future<int> f = p.get_future(); // Obtenir le futur associé à la promesse
-p.set_value(42);                  // Mettre une valeur dans la promesse, débloquer le futur
-f.get();                          // Attendre la valeur de la promesse
+std::promise<int> p;                 // Créer une promesse
+std::future<int> f = p.get_future(); // Obtenir le futur associé
+p.set_value(42);                     // Assigne valeur, débloque le futur
+int value = f.get();                 // Attendre la valeur de la promesse
 \end{lstlisting}
 
 \section*{Ordre de mémoire}
@@ -247,15 +260,14 @@ f.get();                          // Attendre la valeur de la promesse
 #include <atomic>
 
 std::atomic_thread_fence(std::memory_order_acquire); // Barrière d'acquisition
-
 std::atomic_thread_fence(std::memory_order_release); // Barrière de libération
 
-std::memory_order_relaxed;       // Aucun ordre n'est garanti
-std::memory_order_consume;       // Garantit la lecture des dépendances
-std::memory_order_acquire;       // Garantit la lecture des données
-std::memory_order_release;       // Garantit l'écriture des données
-std::memory_order_acq_rel;       // Garantit la lecture et l'écriture des données
-std::memory_order_seq_cst;       // Garantit l'ordre séquentiel
+std::memory_order_relaxed;  // Aucun ordre n'est garanti
+std::memory_order_consume;  // Garantit la lecture des dépendances
+std::memory_order_acquire;  // Garantit la lecture des données
+std::memory_order_release;  // Garantit l'écriture des données
+std::memory_order_acq_rel;  // Garantit en r,w
+std::memory_order_seq_cst;  // Garantit l'ordre séquentiel
 \end{lstlisting}
 
 Dans cet exemple, le compilateur peut décider de réordonner les instructions de manière à ce que \cd{y} soit affecté avant \cd{b}, car il n'y a pas de dépendance entre les deux instructions, et le compilateur ne sait pas que \cd{t1} et \cd{t2} sont exécutés en parallèle.
@@ -272,18 +284,15 @@ En utilisant des ordres de mémoire, on peut garantir que les instructions sont 
 \begin{lstlisting}
 std::atomic<int> a = 0, b = 0;
 std::atomic<int> x = 0, y = 0;
-
 void thread1() {
     // Libération : toutes les écritures avant cette ligne sont visibles
     a.store(1, std::memory_order_release);
-    // Acquisition : toutes les lectures après cette ligne voient les écritures précédentes
+    // Acquisition : toutes les lectures après cette ligne
+    // voient les écritures précédentes
     x = b.load(std::memory_order_acquire);
 }
-
 void thread2() {
-    // Libération : toutes les écritures avant cette ligne sont visibles
     b.store(1, std::memory_order_release);
-    // Acquisition : toutes les lectures après cette ligne voient les écritures précédentes
     y = a.load(std::memory_order_acquire);
 }
 \end{lstlisting}
@@ -291,41 +300,22 @@ void thread2() {
 \section*{Gestion d'arrêt}
 \begin{lstlisting}
 #include <stop_token> // C++20
-
 std::stop_source ss;
 std::stop_token st = ss.get_token();
-
-while (!st.stop_requested()) {
-    // Code
-}
-
+while (!st.stop_requested()) { /* code */ }
 ss.request_stop(); // Demander l'arrêt
-
-// Utile avec std::jthread
-std::jthread jt([](std::stop_token st) {
-    while (!st.stop_requested()) {
-        // Code
-    }
-});
-
-jt.request_stop(); // Demander l'arrêt
+// Utilisé typiquement avec std::jthread
 \end{lstlisting}
 
 \section*{Asynchronisme}
 
 \begin{lstlisting}
 #include <future>
-
 // Exécuter de manière asynchrone
-std::future<int> f = std::async(std::launch::async, []() {
-    return 42;
-});
+std::future<int> f = std::async(std::launch::async, []{ return 42; });
 f.get(); // Attendre le résultat
-
 // Exécuter de manière différée
-std::future<int> f = std::async(std::launch::deferred, []() {
-    return 42;
-});
+std::future<int> f = std::async(std::launch::deferred, []{return 42; });
 f.get(); // Déclencher l'exécution et attendre le résultat
 \end{lstlisting}
 
@@ -335,46 +325,29 @@ f.get(); // Déclencher l'exécution et attendre le résultat
 #include <omp.h>
 
 #pragma omp parallel
-{
-    // Code exécuté par chaque thread
-}
+{ /* Code exécuté par chaque thread */}
 
 #pragma omp parallel for
-for (int i = 0; i < 10; ++i) {
-    // Code exécuté par chaque thread
-}
+for (int i = 0; i < 10; ++i) { /* Code exécuté par chaque thread */ }
 
 int sum = 0;
 #pragma omp parallel for reduction(+:sum)
-for (int i = 0; i < 10; ++i) {
-    sum += i;
-}
-
+for (int i = 0; i < 10; ++i) { sum += i; }
 \end{lstlisting}
 
 \section*{Moniteur}
 
 \begin{lstlisting}
 #include <condition_variable>
-
-class Monitor {
-public:
-    void enter() {
-        std::unique_lock<std::mutex> lock(m);
-        cv.wait(lock, [this] { return !locked; });
-        locked = true;
-    }
-
-    void leave() {
-        std::lock_guard<std::mutex> lock(m);
-        locked = false;
-        cv.notify_one();
-    }
-
+struct Monitor {
+    void enter() { std::unique_lock<std::mutex> lock(m);
+                   cv.wait(lock, [this] { return !locked; });
+                   locked = true; }
+    void leave() { std::lock_guard<std::mutex> lock(m);
+                   locked = false;
+                   cv.notify_one(); }
 private:
-    std::mutex m;
-    std::condition_variable cv;
-    bool locked = false;
+    std::mutex m; std::condition_variable cv; bool locked = false;
 };
 \end{lstlisting}
 
@@ -383,21 +356,20 @@ private:
 \begin{lstlisting}
 #include <chrono>
 
-std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+auto now = std::chrono::system_clock::now();
 std::chrono::system_clock::time_point epoch; // Temps UNIX
 std::this_thread::sleep_for(123ms);
-
-// Constantes littérales temporelles C++14
-auto u = 42us; // Microsecondes
+auto u = 42us; // // Constantes littérales temporelles C++14
 \end{lstlisting}
 
-Exemple de mesure du temps d'exécution d'une fonction.
+Exemple de mesure du temps d'exécution d'une fonction :
 
 \begin{lstlisting}
 auto start = std::chrono::high_resolution_clock::now();
 function();
 auto end = std::chrono::high_resolution_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+    end - start);
 std::cout << duration.count() << "ms" << std::endl;
 \end{lstlisting}
 
@@ -405,18 +377,15 @@ std::cout << duration.count() << "ms" << std::endl;
 
 \begin{lstlisting}
 #include <new>
-
 void* p = operator new(42);       // Allouer de la mémoire alignée
 operator delete(p);               // Libérer la mémoire
-
-void* p = operator new(42, std::align_val_t(64)); // Allouer de la mémoire alignée sur 64 octets
-
+void* p = operator new(42, std::align_val_t(64)); // Aligné à 64 octets
 struct alignas(64) S { int x; };  // Alignement de la structure
-
-// Cette constante représente la taille en octets de la plus petite unité de mémoire qui peut être affectée par le false sharing.
+// Cette constante représente la taille en octets de la plus petite unité
+// de mémoire qui peut être affectée par le false sharing.
 std::hardware_destructive_interference_size;
-
-// Cette constante représente la taille en octets de la plus grande unité de mémoire qui est avantageuse à partager entre les threads.
+// Cette constante représente la taille en octets de la plus grande unité
+// de mémoire qui est avantageuse à partager entre les threads.
 std::hardware_constructive_interference_size;
 \end{lstlisting}
 
@@ -425,92 +394,77 @@ Utilisation de \cd{std::packaged\_task} pour encapsuler une fonction et obtenir 
 
 \begin{lstlisting}
 #include <future>
-
 int add(int a, int b) { return a + b; }
-
 std::packaged_task<int(int, int)> task(add);
 std::future<int> f = task.get_future();
 task(1, 2);
-
 f.get(); // Attendre le résultat
 
 // Avec bind et lambda
 std::packaged_task<int()> task(std::bind(add, 1, 2));
 std::future<int> f = task.get_future();
-task();
-f.get(); // Attendre le résultat
+task(); f.get(); // Execute et attendre le résultat
 
 // Avec arguments génériques (templates)
 template <typename F, typename... Args>
 auto async(F&& f, Args&&... args) {
-    std::packaged_task<std::invoke_result_t<F, Args...>()> task(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+    std::packaged_task<std::invoke_result_t<F, Args...>()> task(
+        std::bind(std::forward<F>(f), std::forward<Args>(args)...));
     std::future<std::invoke_result_t<F, Args...>()> f = task.get_future();
-    task();
-    return f;
-}
-
+    task(); return f; }
 auto f = async(add, 1, 2);
-
 f.get(); // Attendre le résultat
+
+// Objets complexes passés avec std::ref
+std::vector<int> v = {1, 2, 3};
+auto f = async([](std::vector<int>& v) { return v.size(); }, std::ref(v));
 \end{lstlisting}
 
 \section*{Algorithmes parallèles (C++17)}
 
 \begin{lstlisting}
 #include <execution>
-
-std::vector<int> vec(1000, 1);
-std::for_each(std::execution::par, vec.begin(), vec.end(), [](int& n) {
-    n *= 2; });
+std::vector<int> v(1000, 1);
+std::for_each(std::execution::par, v.begin(), v.end(), [](int& n){n*=2;});
 \end{lstlisting}
 
 \section*{Coroutines (C++20)}
 
 \begin{lstlisting}
-    #include <coroutine>
-    #include <iostream>
+#include <coroutine>
+#include <iostream>
 
-    struct ReturnObject {
-        struct promise_type {
-            ReturnObject get_return_object() { return {}; }
-            std::suspend_never initial_suspend() { return {}; }
-            std::suspend_never final_suspend() noexcept { return {}; }
-            void return_void() {}
-            void unhandled_exception() { std::terminate(); }
-        };
+struct ReturnObject {
+    struct promise_type {
+        ReturnObject get_return_object() { return {}; }
+        std::suspend_never initial_suspend() { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
+        void return_void() {}
+        void unhandled_exception() { std::terminate(); }
     };
-
-    ReturnObject foo() {
-        std::cout << "Hello" << std::endl;
-        co_await std::suspend_always{};
-        std::cout << "World" << std::endl;
-    }
-
-    int main() {
-        auto ret = foo();
-        // Coroutine starts, prints "Hello", suspends, then resumes and prints "World"
-    }
+};
+ReturnObject foo() { co_await std::suspend_always{}; /* Suspendre */ }
+int main() {
+    auto ret = foo();
+    auto handle =
+        std::coroutine_handle<ReturnObject::promise_type>::from_promise(
+        ret.promise);
+    handle.resume(); // Reprendre
+}
 \end{lstlisting}
 
 \section*{Processus}
 
 \begin{lstlisting}
 #include <unistd.h>
-
 pid_t pid = fork();               // Créer un processus enfant
-if (pid == 0) {
-    // Code du processus enfant
-    auto parent_pid = getppid();
-} else if (pid == -1) {
-    // Erreur
-} else {
-    // Code du processus parent
-    auto child_pid = pid;
-}
+if (pid == 0) { auto parent_pid = getppid(); /* enfant */ }
+else if (pid == -1) { /* Erreur */ }
+else { auto child_pid = pid; /* parent */ }
 \end{lstlisting}
 
 \section*{IPC}
-
+Inter-Process Communication (IPC) : partage de données entre processus.
 \begin{lstlisting}
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -518,32 +472,60 @@ if (pid == 0) {
 
 // Mémoire partagée
 key_t key = ftok("file", 42);     // Générer une clé unique
-int shmid = shmget(key, 1024, 0666 | IPC_CREAT); // Créer un segment de mémoire partagée
-void* addr = shmat(shmid, NULL, 0); // Attacher le segment de mémoire partagée
-shmctl(shmid, IPC_RMID, NULL);     // Supprimer le segment de mémoire partagée
+// Créer un segment de mémoire partagée de 1024 octets
+int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+void* addr = shmat(shmid, NULL, 0); // Attacher le segment
+shmctl(shmid, IPC_RMID, NULL);      // Supprimer le segment
 
 // Sémaphores
-int semid = semget(key, 1, 0666 | IPC_CREAT); // Créer un ensemble de sémaphores
-semctl(semid, 0, SETVAL, 1);      // Initialiser le sémaphore à 1
-semop(semid, &op, 1);              // Opération sur le sémaphore
+int semid = semget(key, 1, 0666 | IPC_CREAT); // Créer un sémaphore
+semctl(semid, 0, SETVAL, 1);   // Initialiser le sémaphore à 1
+semop(semid, &op, 1);          // Opération sur le sémaphore
 
 // Files de messages
 int msqid = msgget(key, 0666 | IPC_CREAT); // Créer une file de messages
-msgsnd(msqid, &msg, sizeof(msg), 0); // Envoyer un message
+msgsnd(msqid, &msg, sizeof(msg), 0);    // Envoyer un message
 msgrcv(msqid, &msg, sizeof(msg), 0, 0); // Recevoir un message
-msgctl(msqid, IPC_RMID, NULL);    // Supprimer la file de messages
+msgctl(msqid, IPC_RMID, NULL);          // Supprimer la file de messages
 
 // Signaux
 kill(pid, SIGKILL);               // Envoyer un signal
+void handler(int signum) { /* appelé à la réception du signal */ }
 signal(SIGINT, handler);          // Gérer un signal
+pause();                          // Attendre un signal (bloquant)
 
 // Pipes
-int fd[2];
+int fd[2]; // Descripteurs de fichier, chaque extrémité du tube
 pipe(fd);                         // Créer un tube
 write(fd[1], "Hello", 5);         // Écrire dans le tube
 read(fd[0], buf, 5);              // Lire depuis le tube
-close(fd[0]);                     // Fermer le tube
+close(fd[0]);                     // Fermer une extrémité du tube
 \end{lstlisting}
 
+\section *{Perf}
+L'outil \cd{perf} permet de profiler les performances d'un programme.
+Utile pour détecter les goulots d'étranglement et les problèmes de performances.
+Tels que les appels système, la prediction de branchement, les caches,
+le \emph{false sharing}, les instructions SIMD, etc.
+
+\begin{lstlisting}
+perf record ./programme
+perf report
+
+perf stat ./programme
+perf top
+\end{lstlisting}
+
+\section *{Glossaire}
+\begin{description}
+    \item[Section critique] Partie du code où les ressources partagées sont utilisées
+    \item[Starvation] Un thread n'arrive jamais à entrer en section critique
+    \item[Deadlock] Deux threads attendent indéfiniment l'un l'autre
+    \item[Livelock] Deux threads se répondent mutuellement sans progresser
+    \item[Spurious wake] Réveil inattendu d'un thread en attente
+    \item[Spinlock] Attente active, vérification répétée d'une condition
+    \item[False sharing] Des threads accèdent à des données sur la même ligne de cache
+    \item[Atomicité] Opération indivisible, non interrompue
+\end{description}
 \end{multicols*}
 \end{document}
