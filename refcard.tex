@@ -219,10 +219,10 @@ f.clear();                             // Mettre à 0
 \begin{lstlisting}
 #include <semaphore> // C++20
 
-std::counting_semaphore sem(2);   // Créer un sémaphore avec 2 jetons
+std::counting_semaphore<2> sem(2); // Créer un sémaphore avec 2 jetons
 sem.acquire();       // Acquérir un jeton (décrémenter, bloquant)
 sem.release();       // Libérer un jeton (incrémenter)
-std::binary_semaphore bsem;       // Créer un sémaphore binaire
+std::binary_semaphore bsem(1);     // Créer un sémaphore binaire (initial: 1)
 bsem.acquire();      // Acquérir le jeton (bloquant)
 bsem.release();      // Libérer le jeton
 
@@ -355,6 +355,7 @@ private:
 
 \begin{lstlisting}
 #include <chrono>
+using namespace std::chrono_literals; // Pour 1s, 123ms, 42us, etc.
 
 auto now = std::chrono::system_clock::now();
 std::chrono::system_clock::time_point epoch; // Temps UNIX
@@ -512,7 +513,7 @@ read(fd[0], buf, 5);              // Lire depuis le tube
 close(fd[0]);                     // Fermer une extrémité du tube
 \end{lstlisting}
 
-\section *{Perf}
+\section*{Perf}
 L'outil \cd{perf} permet de profiler les performances d'un programme.
 Utile pour détecter les goulots d'étranglement et les problèmes de performances.
 Tels que les appels système, la prédiction de branchement, les caches,
@@ -526,7 +527,7 @@ perf stat ./programme
 perf top
 \end{lstlisting}
 
-\section *{Glossaire}
+\section*{Glossaire}
 \begin{description}
     \item[Section critique] Partie du code où les ressources partagées sont utilisées
     \item[Starvation] Un thread n'arrive jamais à entrer en section critique
