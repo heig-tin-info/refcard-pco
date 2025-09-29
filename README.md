@@ -1,6 +1,6 @@
 # Carte de référence de Programmation Concurrente pour étudiants
 
-![.github/workflows/ci.yml](https://github.com/heig-tin-info/refcard-pco/workflows/.github/workflows/ci.yml/badge.svg)
+![CI](https://github.com/heig-tin-info/refcard-pco/actions/workflows/ci.yml/badge.svg?branch=master)
 
 Cette carte de référence est destinée à accompagner l'étudiant durant ses études d'ingénieur. Elle est en principe autorisée durant les travaux écrits et examens ; à confirmer par le professeur en charge de dispenser la matière.
 
@@ -8,7 +8,7 @@ Cette carte de référence est destinée à accompagner l'étudiant durant ses �
 
 La carte de référence est une feuille A4 recto-verso supposément imprimée sur du papier cartonné violet :
 
-[![Preview](preview.png)](https://github.com/heig-tin-info/refcard-pco/releases/latest/download/refcard-pco.pdf)
+[![Preview](https://github.com/heig-tin-info/refcard-pco/releases/latest/download/preview.png)](https://github.com/heig-tin-info/refcard-pco/releases/latest/download/refcard-pco.pdf)
 
 ## Build
 
