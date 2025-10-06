@@ -122,7 +122,7 @@ std::this_thread::sleep_for(1s);     // Attendre 1 seconde
 std::this_thread::yield();           // Relâcher le CPU
 std::thread::hardware_concurrency(); // Threads supportés par le CPU
 
-auto std::thread t([]() {            // Lambda function
+std::thread t([]() {                 // Lambda function
     std::cout << "Hello" << std::endl; });
 
 // Conteneur RAII, destructeur attend la fin du thread.
@@ -161,7 +161,7 @@ Un mutex récursif peut être verrouillé plusieurs fois par le même thread, ma
 \begin{lstlisting}
 static std::recursive_mutex rm;
 std::vector<int> sharedData;
-void fibonacci(int n) {
+int fibonacci(int n) {
     std::lock_guard<std::recursive_mutex> lg(rm);  // Verrouillage récursif
     sharedData.push_back(n);
     if (n <= 2) return n;
@@ -219,10 +219,10 @@ f.clear();                             // Mettre à 0
 \begin{lstlisting}
 #include <semaphore> // C++20
 
-std::counting_semaphore sem(2);   // Créer un sémaphore avec 2 jetons
+std::counting_semaphore<2> sem(2); // Créer un sémaphore avec 2 jetons
 sem.acquire();       // Acquérir un jeton (décrémenter, bloquant)
 sem.release();       // Libérer un jeton (incrémenter)
-std::binary_semaphore bsem;       // Créer un sémaphore binaire
+std::binary_semaphore bsem(1);     // Créer un sémaphore binaire (initial: 1)
 bsem.acquire();      // Acquérir le jeton (bloquant)
 bsem.release();      // Libérer le jeton
 
@@ -235,7 +235,7 @@ bsem.release();      // Libérer le jeton
 #include <barrier> // C++20
 std::barrier b(2);       // Créer une barrière avec 2 threads
 b.arrive_and_wait();     // Attendre les 2 threads à la barrière
-b.arrive_and_drop();     // Attendre tous les threads
+b.arrive_and_drop();     // Arriver et se retirer de la barrière
 
 #include <latch> // C++20
 std::latch l(2);         // Créer un latch initialisé à 2
@@ -355,11 +355,12 @@ private:
 
 \begin{lstlisting}
 #include <chrono>
+using namespace std::chrono_literals; // Pour 1s, 123ms, 42us, etc.
 
 auto now = std::chrono::system_clock::now();
 std::chrono::system_clock::time_point epoch; // Temps UNIX
 std::this_thread::sleep_for(123ms);
-auto u = 42us; // // Constantes littérales temporelles C++14
+auto u = 42us; // Constantes littérales temporelles C++14
 \end{lstlisting}
 
 Exemple de mesure du temps d'exécution d'une fonction :
@@ -403,21 +404,21 @@ f.get(); // Attendre le résultat
 // Avec bind et lambda
 std::packaged_task<int()> task(std::bind(add, 1, 2));
 std::future<int> f = task.get_future();
-task(); f.get(); // Execute et attendre le résultat
+task(); f.get(); // Exécuter et attendre le résultat
 
 // Avec arguments génériques (templates)
 template <typename F, typename... Args>
 auto async(F&& f, Args&&... args) {
     std::packaged_task<std::invoke_result_t<F, Args...>()> task(
         std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-    std::future<std::invoke_result_t<F, Args...>()> f = task.get_future();
-    task(); return f; }
-auto f = async(add, 1, 2);
-f.get(); // Attendre le résultat
+    std::future<std::invoke_result_t<F, Args...>> fut = task.get_future();
+    task(); return fut; }
+auto fut = async(add, 1, 2);
+fut.get(); // Attendre le résultat
 
 // Objets complexes passés avec std::ref
 std::vector<int> v = {1, 2, 3};
-auto f = async([](std::vector<int>& v) { return v.size(); }, std::ref(v));
+auto fut = async([](std::vector<int>& v) { return v.size(); }, std::ref(v));
 \end{lstlisting}
 
 \section*{Algorithmes parallèles (C++17)}
@@ -432,24 +433,34 @@ std::for_each(std::execution::par, v.begin(), v.end(), [](int& n){n*=2;});
 
 \begin{lstlisting}
 #include <coroutine>
-#include <iostream>
 
-struct ReturnObject {
+// Générateur simple
+struct Generator {
     struct promise_type {
-        ReturnObject get_return_object() { return {}; }
-        std::suspend_never initial_suspend() { return {}; }
-        std::suspend_never final_suspend() noexcept { return {}; }
+        int value;
+        Generator get_return_object() { 
+            return Generator{std::coroutine_handle<promise_type>::from_promise(*this)}; 
+        }
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
         void return_void() {}
+        std::suspend_always yield_value(int v) { value = v; return {}; }
         void unhandled_exception() { std::terminate(); }
     };
+    
+    std::coroutine_handle<promise_type> coro;
+    Generator(std::coroutine_handle<promise_type> h) : coro(h) {}
+    ~Generator() { if (coro) coro.destroy(); }
+    
+    int next() { coro.resume(); return coro.promise().value; }
 };
-ReturnObject foo() { co_await std::suspend_always{}; /* Suspendre */ }
-int main() {
-    auto ret = foo();
-    auto handle =
-        std::coroutine_handle<ReturnObject::promise_type>::from_promise(
-        ret.promise);
-    handle.resume(); // Reprendre
+
+Generator fibonacci() {
+    int a = 0, b = 1;
+    while (true) {
+        co_yield a;
+        auto tmp = a + b; a = b; b = tmp;
+    }
 }
 \end{lstlisting}
 
@@ -502,10 +513,10 @@ read(fd[0], buf, 5);              // Lire depuis le tube
 close(fd[0]);                     // Fermer une extrémité du tube
 \end{lstlisting}
 
-\section *{Perf}
+\section*{Perf}
 L'outil \cd{perf} permet de profiler les performances d'un programme.
 Utile pour détecter les goulots d'étranglement et les problèmes de performances.
-Tels que les appels système, la prediction de branchement, les caches,
+Tels que les appels système, la prédiction de branchement, les caches,
 le \emph{false sharing}, les instructions SIMD, etc.
 
 \begin{lstlisting}
@@ -516,7 +527,7 @@ perf stat ./programme
 perf top
 \end{lstlisting}
 
-\section *{Glossaire}
+\section*{Glossaire}
 \begin{description}
     \item[Section critique] Partie du code où les ressources partagées sont utilisées
     \item[Starvation] Un thread n'arrive jamais à entrer en section critique
